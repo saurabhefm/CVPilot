@@ -12,10 +12,17 @@ import {
   PenTool,
   ArrowRight
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import { ThemeToggle } from "./ThemeToggle";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  SignInButton, 
+  SignUpButton, 
+  UserButton, 
+  useUser 
+} from "@clerk/nextjs";
 
 const Navbar = () => {
+  const { isLoaded, isSignedIn } = useUser();
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
   const toggleMenu = (menu: string) => {
@@ -180,20 +187,45 @@ const Navbar = () => {
             </div>
           </div>
 
-          {/* Right Section */}
           <div className="flex items-center gap-4 lg:gap-6">
             <ThemeToggle />
             <div className="h-6 w-px bg-border hidden sm:block" />
             <ATSBadge />
-            <Link href="/login" className="text-sm font-semibold text-foreground/80 hover:text-foreground transition-colors hidden sm:block">
-              Log in
-            </Link>
-            <Button 
-              size="md"
-              onClick={() => scrollToSection("upload")}
-            >
-              Build Your Resume
-            </Button>
+            
+            {isLoaded && !isSignedIn && (
+              <div className="hidden sm:flex items-center gap-6">
+                <SignInButton mode="modal">
+                  <button className="text-sm font-semibold text-foreground/80 hover:text-foreground transition-colors">
+                    Log in
+                  </button>
+                </SignInButton>
+                <SignUpButton mode="modal">
+                  <Button size="md" className="shadow-lg shadow-brand-mint/10">
+                    Get Started
+                  </Button>
+                </SignUpButton>
+              </div>
+            )}
+
+            {isLoaded && isSignedIn && (
+              <div className="flex items-center gap-4">
+                <Link href="/builder">
+                  <Button variant="outline" size="sm" className="hidden lg:flex border-brand-mint/20 text-brand-mint hover:bg-brand-mint/5">
+                    My Resumes
+                  </Button>
+                </Link>
+                <UserButton 
+                  afterSignOutUrl="/"
+                  appearance={{
+                    elements: {
+                      userButtonAvatarBox: "w-10 h-10 border-2 border-brand-mint/20 hover:border-brand-mint transition-all",
+                      userButtonPopoverCard: "bg-surface border border-border shadow-2xl",
+                      userButtonPopoverActionButtonText: "text-foreground font-medium",
+                    }
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

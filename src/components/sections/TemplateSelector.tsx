@@ -39,14 +39,14 @@ interface TemplateSelectorProps {
 
 const TemplateSelector = ({ selectedTemplate, onSelect }: TemplateSelectorProps) => {
   return (
-    <section className="py-24 bg-slate-50">
+    <section id="templates" className="py-24 bg-background transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <div className="inline-flex p-3 bg-brand-mint/10 rounded-2xl text-brand-mint mb-6">
             <Layout className="w-8 h-8" />
           </div>
-          <h2 className="text-4xl font-extrabold text-[#0F172A] mb-4">Select Your Template</h2>
-          <p className="text-slate-500 text-lg max-w-2xl mx-auto">
+          <h2 className="text-4xl font-extrabold text-foreground mb-4">Select Your Template</h2>
+          <p className="text-slate-500 dark:text-slate-400 text-lg max-w-2xl mx-auto font-medium">
             Choose from our recruiter-verified templates designed to beat the ATS.
           </p>
         </div>
@@ -57,8 +57,8 @@ const TemplateSelector = ({ selectedTemplate, onSelect }: TemplateSelectorProps)
               key={template.id}
               whileHover={{ y: -10 }}
               className={`
-                group relative bg-white rounded-3xl p-6 border-2 transition-all duration-300
-                ${selectedTemplate === template.id ? "border-brand-mint ring-4 ring-brand-mint/5" : "border-transparent shadow-xl shadow-slate-200/50 hover:border-slate-200"}
+                group relative bg-white dark:bg-slate-900/40 rounded-3xl p-6 border-2 transition-all duration-300
+                ${selectedTemplate === template.id ? "border-brand-mint ring-4 ring-brand-mint/5" : "border-transparent shadow-xl dark:shadow-none hover:border-slate-200 dark:hover:border-white/10"}
               `}
             >
               <div className={`aspect-[3/4] rounded-2xl mb-6 p-3 ${template.color} relative overflow-hidden flex items-center justify-center group-hover:scale-[1.02] transition-transform duration-500`}>
@@ -222,8 +222,8 @@ const TemplateSelector = ({ selectedTemplate, onSelect }: TemplateSelectorProps)
                 </div>
               </div>
 
-              <h3 className="text-lg font-bold text-slate-900 mb-2">{template.name}</h3>
-              <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+              <h3 className="text-lg font-bold text-foreground mb-2">{template.name}</h3>
+              <p className="text-slate-500 dark:text-slate-400 text-sm mb-6 leading-relaxed font-medium">
                 {template.description}
               </p>
 
@@ -233,7 +233,7 @@ const TemplateSelector = ({ selectedTemplate, onSelect }: TemplateSelectorProps)
                   w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all
                   ${selectedTemplate === template.id 
                     ? "bg-brand-mint text-white" 
-                    : "bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-900"}
+                    : "bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 hover:text-foreground dark:hover:text-white"}
                 `}
               >
                 {selectedTemplate === template.id ? (

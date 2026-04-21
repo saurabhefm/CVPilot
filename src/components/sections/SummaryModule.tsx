@@ -56,7 +56,7 @@ const SummaryModule = () => {
   };
 
   return (
-    <section className="py-24 bg-white" id="summary">
+    <section className="py-24 bg-background transition-colors duration-300" id="summary">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col lg:flex-row gap-16 items-start">
           
@@ -64,32 +64,32 @@ const SummaryModule = () => {
             <div className="w-16 h-16 bg-brand-mint/10 rounded-2xl flex items-center justify-center text-brand-mint mb-8">
                <Sparkles className="w-8 h-8" />
             </div>
-            <h2 className="text-4xl font-extrabold text-[#0F172A] mb-6">
+            <h2 className="text-4xl font-extrabold text-foreground mb-6">
               Recruiter-Focused <br />
               <span className="text-brand-mint">AI Summary Generator</span>
             </h2>
-            <p className="text-slate-500 text-lg mb-8 leading-relaxed italic">
-              Stop struggling with "About Me" sections. CVPilot analyzes your career highlights and the target role to craft a punchy, 3-sentence summary that grabs attention in <span className="font-bold text-[#0F172A]">under 6 seconds.</span>
+            <p className="text-slate-500 dark:text-slate-400 text-lg mb-8 leading-relaxed font-medium">
+              Stop struggling with "About Me" sections. CVPilot analyzes your career highlights and the target role to craft a punchy, 3-sentence summary that grabs attention in <span className="font-bold text-foreground">under 6 seconds.</span>
             </p>
             
             <div className="space-y-6 mb-12">
               <div className="flex gap-4">
                 <Target className="w-6 h-6 text-brand-mint flex-shrink-0" />
                 <div>
-                  <p className="font-bold text-[#0F172A]">Industry Keywords</p>
-                  <p className="text-slate-500 text-sm italic">Naturally baked into every sentence.</p>
+                  <p className="font-bold text-foreground">Industry Keywords</p>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm italic">Naturally baked into every sentence.</p>
                 </div>
               </div>
               <div className="flex gap-4">
                 <Zap className="w-6 h-6 text-brand-mint flex-shrink-0" />
                 <div>
-                  <p className="font-bold text-[#0F172A]">Action-Oriented Tone</p>
-                  <p className="text-slate-500 text-sm italic">Focused on outcomes and quantifiable results.</p>
+                  <p className="font-bold text-foreground">Action-Oriented Tone</p>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm italic">Focused on outcomes and quantifiable results.</p>
                 </div>
               </div>
             </div>
 
-            <div className="p-8 bg-slate-50 border border-slate-200 rounded-[32px] space-y-6 shadow-sm">
+            <div className="p-8 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-[32px] space-y-6 shadow-sm transition-colors">
                <div className="space-y-4">
                  <div className="space-y-2">
                    <div className="flex items-center justify-between">
@@ -104,7 +104,7 @@ const SummaryModule = () => {
                     value={highlights}
                     onChange={(e) => setHighlights(e.target.value)}
                     placeholder={hasStoredResume ? "Optional: Add specific focus points or leave empty to use your uploaded resume..." : "e.g. 8+ years in Digital Marketing, managed $2M budget, scaled ROAS by 40%..."}
-                    className="w-full h-32 p-4 bg-white border border-slate-200 rounded-2xl text-sm focus:ring-2 focus:ring-brand-mint outline-none transition-all placeholder:text-slate-300"
+                    className="w-full h-32 p-4 bg-white dark:bg-[#020617] border border-slate-200 dark:border-white/10 rounded-2xl text-sm focus:ring-2 focus:ring-brand-mint outline-none transition-all placeholder:text-slate-300 text-foreground"
                    />
                  </div>
                  <div className="space-y-2">
@@ -114,7 +114,7 @@ const SummaryModule = () => {
                     value={jdContext}
                     onChange={(e) => setJdContext(e.target.value)}
                     placeholder="e.g. Senior Marketing Manager position at Google..."
-                    className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-mint outline-none transition-all placeholder:text-slate-300"
+                    className="w-full h-12 px-4 bg-white dark:bg-[#020617] border border-slate-200 dark:border-white/10 rounded-xl text-sm focus:ring-2 focus:ring-brand-mint outline-none transition-all placeholder:text-slate-300 text-foreground"
                    />
                  </div>
                </div>
@@ -136,7 +136,7 @@ const SummaryModule = () => {
 
           {/* Visual Showcase */}
           <div className="lg:w-1/2 w-full lg:sticky lg:top-32">
-            <div className="bg-brand-charcoal rounded-[40px] p-12 shadow-2xl relative overflow-hidden min-h-[500px]">
+            <div className="bg-slate-900 dark:bg-slate-900 rounded-[40px] p-12 shadow-2xl relative overflow-hidden min-h-[500px] transition-colors">
                <div className="absolute top-0 right-0 w-32 h-32 bg-brand-mint/10 blur-3xl rounded-full" />
                
                <p className="text-white/40 text-xs font-bold uppercase tracking-[0.2em] mb-8">Dynamic Output Preview</p>

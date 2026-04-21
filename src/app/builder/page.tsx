@@ -24,6 +24,9 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "next-themes";
+import { useUser, SignInButton } from "@clerk/nextjs";
+import { saveResumeAction } from "@/lib/actions";
+import { Cloud, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
 import jsPDF from "jspdf";
@@ -31,6 +34,9 @@ import { toPng } from "html-to-image";
 
 const BuilderPage = () => {
   const { theme } = useTheme();
+  const { isLoaded, isSignedIn } = useUser();
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [activeTab, setActiveTab] = useState("content");
   const [isExporting, setIsExporting] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -353,6 +359,29 @@ const BuilderPage = () => {
     updateData("education", resumeData.education.filter((_, i) => i !== index));
   };
 
+  const handleSave = async () => {
+    if (!isSignedIn) return;
+    
+    setIsSaving(true);
+    try {
+      const result = await saveResumeAction({
+        title: resumeData.name || "Untitled Resume",
+        jobTitle: resumeData.jobTitle,
+        content: resumeData,
+        matchScore: parseInt(resumeData.matchScore || "0"),
+        templateId: selectedTemplate,
+      });
+      if (result.success) {
+        setLastSaved(new Date());
+      }
+    } catch (err) {
+      console.error("Save failed:", err);
+      alert("Failed to save to profile.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="flex h-screen bg-[#F8FAFC] overflow-hidden">
       <style jsx global>{`
@@ -391,12 +420,35 @@ const BuilderPage = () => {
             <ChevronLeft className="w-4 h-4 text-slate-500 group-hover:text-brand-mint transition-colors" />
             <span className="font-black text-xl tracking-tighter text-foreground dark:text-white">CV<span className="text-brand-mint">PILOT</span></span>
           </Link>
-          <button 
-            onClick={() => setIsSettingsOpen(true)}
-            className="w-9 h-9 bg-slate-100 dark:bg-white/5 rounded-xl flex items-center justify-center hover:bg-brand-mint/20 hover:text-brand-mint transition-all border border-border dark:border-white/5 group"
-          >
-             <Settings className="w-4 h-4 text-slate-400 group-hover:rotate-90 transition-transform duration-500" />
-          </button>
+          <div className="flex items-center gap-2">
+            {isLoaded && isSignedIn && (
+              <button 
+                onClick={handleSave}
+                disabled={isSaving}
+                className="flex items-center gap-2 px-3 py-1.5 bg-brand-mint/10 text-brand-mint rounded-lg text-xs font-bold hover:bg-brand-mint/20 transition-all border border-brand-mint/20 disabled:opacity-50"
+              >
+                {isSaving ? (
+                  <RotateCcw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Cloud className="w-3.5 h-3.5" />
+                )}
+                {isSaving ? "Syncing..." : lastSaved ? "Synced" : "Save"}
+              </button>
+            )}
+            {isLoaded && !isSignedIn && (
+              <SignInButton mode="modal">
+                <button className="px-3 py-1.5 bg-slate-100 dark:bg-white/5 text-slate-500 rounded-lg text-xs font-bold hover:bg-brand-mint/10 hover:text-brand-mint transition-all border border-border dark:border-white/5">
+                  Save to Profile
+                </button>
+              </SignInButton>
+            )}
+            <button 
+              onClick={() => setIsSettingsOpen(true)}
+              className="w-9 h-9 bg-slate-100 dark:bg-white/5 rounded-xl flex items-center justify-center hover:bg-brand-mint/20 hover:text-brand-mint transition-all border border-border dark:border-white/5 group"
+            >
+               <Settings className="w-4 h-4 text-slate-400 group-hover:rotate-90 transition-transform duration-500" />
+            </button>
+          </div>
         </div>
 
         <AnimatePresence>
