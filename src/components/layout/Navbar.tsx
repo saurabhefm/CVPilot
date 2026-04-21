@@ -215,7 +215,6 @@ const Navbar = () => {
                   </Button>
                 </Link>
                 <UserButton 
-                  afterSignOutUrl="/"
                   appearance={{
                     elements: {
                       userButtonAvatarBox: "w-10 h-10 border-2 border-brand-mint/20 hover:border-brand-mint transition-all",
