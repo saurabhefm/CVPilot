@@ -17,7 +17,8 @@ import {
   Phone,
   Mail,
   MapPin,
-  Loader2
+  Loader2,
+  Trash2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/Button";
@@ -29,6 +30,8 @@ const BuilderPage = () => {
   const [activeTab, setActiveTab] = useState("content");
   const [isExporting, setIsExporting] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(384); // 96 * 4 (w-96 default)
+  const isResizing = useRef(false);
   const resumeRef = useRef<HTMLDivElement>(null);
   
   const [resumeData, setResumeData] = useState({
@@ -37,10 +40,23 @@ const BuilderPage = () => {
     phone: "+91 9392495712",
     location: "Pune, India (Remote)",
     jobTitle: "CI/CD & DevOps Engineer",
-    summary: "Hands-on DevOps Engineer with a focus on CI/CD automation...",
-    experience: [],
-    education: [],
-    skills: [],
+    summary: "Hands-on DevOps Engineer with a focus on CI/CD automation and pipeline deployment support. Proficient in building automated workflows using Jenkins, Git, and ArgoCD to streamline application delivery in cloud-native environments.",
+    experience: [
+      { 
+        company: "NTT DATA", 
+        role: "DevOps Engineer", 
+        period: "Feb 2025 - Present",
+        bullets: [
+          "Pipeline Automation: Implementing and maintaining end-to-end CI/CD processes using Jenkins, ArgoCD & Actions.",
+          "Deployment Support: Managing infrastructure and application deployments using CICD tool.",
+          "Version Control: Managing source code repositories and branching strategies through Bitbucket, Git, and GitHub."
+        ]
+      }
+    ],
+    education: [
+      { school: "Premier Engineering College", degree: "B.Tech Computer Science", year: "2022" }
+    ],
+    skills: ["Kubernetes", "Docker", "ArgoCD", "Jenkins", "Terraform", "Git", "Bitbucket", "Ansible", "YAML", "Shell Scripting"],
     matchScore: "92"
   });
   const [selectedTemplate, setSelectedTemplate] = useState("modern");
@@ -54,13 +70,46 @@ const BuilderPage = () => {
       if (storedTemplate) setSelectedTemplate(storedTemplate);
 
       if (storedProfile) {
-        const profile = JSON.parse(storedProfile);
-        setResumeData(prev => ({
-          ...prev,
-          ...profile,
-          matchScore: storedScore || prev.matchScore
-        }));
+        try {
+          const profile = JSON.parse(storedProfile);
+          
+          // Safety Sanitizer: Ensure critical fields are always arrays
+          const sanitizedProfile = {
+            ...profile,
+            experience: Array.isArray(profile.experience) ? profile.experience : [],
+            education: Array.isArray(profile.education) ? profile.education : [],
+            skills: Array.isArray(profile.skills) ? profile.skills : 
+                    (typeof profile.skills === "string" ? profile.skills.split(",").map((s: string) => s.trim()).filter(Boolean) : [])
+          };
+
+          setResumeData(prev => ({
+            ...prev,
+            ...sanitizedProfile,
+            matchScore: storedScore || prev.matchScore
+          }));
+        } catch (err) {
+          console.error("Critical: Failed to parse or sanitize stored profile", err);
+        }
       }
+
+      // Sidebar resizing logic
+      const handleMouseMove = (e: MouseEvent) => {
+        if (!isResizing.current) return;
+        const newWidth = Math.min(Math.max(300, e.clientX), 600);
+        setSidebarWidth(newWidth);
+      };
+
+      const handleMouseUp = () => {
+        isResizing.current = false;
+        document.body.style.cursor = "default";
+      };
+
+      window.addEventListener("mousemove", handleMouseMove);
+      window.addEventListener("mouseup", handleMouseUp);
+      return () => {
+        window.removeEventListener("mousemove", handleMouseMove);
+        window.removeEventListener("mouseup", handleMouseUp);
+      };
     }
   }, []);
 
@@ -70,22 +119,45 @@ const BuilderPage = () => {
     setIsDownloading(true);
     try {
       const element = resumeRef.current;
+      const elementWidth = element.offsetWidth;
+      const elementHeight = element.offsetHeight;
       
-      // Capture high-quality PNG
+      // Calculate A4 height in pixels relative to the 800px width
+      // A4 ratio is ~1.414. 800 * 1.414 = 1131.2
+      const a4Height = 1131;
+
+      // Capture high-quality PNG of the entire content
       const dataUrl = await toPng(element, { 
         quality: 1, 
         pixelRatio: 2,
         backgroundColor: "#ffffff"
       });
 
-      // Calculate PDF dimensions based on the element size
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "px",
-        format: [element.offsetWidth, element.offsetHeight]
+        format: [elementWidth, a4Height] // Standard A4-ish page
       });
+
+      let heightLeft = elementHeight;
+      let position = 0;
+      let pageNumber = 1;
+
+      // Add the first page
+      pdf.addImage(dataUrl, "PNG", 0, 0, elementWidth, elementHeight);
       
-      pdf.addImage(dataUrl, "PNG", 0, 0, element.offsetWidth, element.offsetHeight);
+      let heightLeft = elementHeight - a4Height;
+      let pageNumber = 1;
+
+      // If content is longer than one page, add more pages
+      while (heightLeft > 0) {
+        const position = -(a4Height * pageNumber);
+        pdf.addPage([elementWidth, a4Height], "portrait");
+        pdf.addImage(dataUrl, "PNG", 0, position, elementWidth, elementHeight);
+        heightLeft -= a4Height;
+        pageNumber++;
+      }
+      
       pdf.save(`Resume_${resumeData.name.replace(/\s+/g, "_")}.pdf`);
     } catch (error) {
       console.error("PDF Generation failed:", error);
@@ -94,8 +166,93 @@ const BuilderPage = () => {
     }
   };
 
+  const [polishingIndex, setPolishingIndex] = useState<{exp: number, bullet: number} | null>(null);
+
   const updateData = (field: string, value: any) => {
     setResumeData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const updateExperience = (index: number, field: string, value: any) => {
+    const updatedExperience = [...resumeData.experience];
+    updatedExperience[index] = { ...updatedExperience[index], [field]: value };
+    updateData("experience", updatedExperience);
+  };
+
+  const updateBullet = (expIndex: number, bulletIndex: number, value: string) => {
+    const updatedExperience = [...resumeData.experience];
+    updatedExperience[expIndex].bullets[bulletIndex] = value;
+    updateData("experience", updatedExperience);
+  };
+
+  const handleAIPolish = async (expIndex: number, bulletIndex: number) => {
+    const currentText = resumeData.experience[expIndex].bullets[bulletIndex];
+    if (!currentText || currentText.trim() === "") return;
+
+    setPolishingIndex({ exp: expIndex, bullet: bulletIndex });
+    
+    try {
+      const response = await fetch("/api/ai", {
+        method: "POST",
+        body: JSON.stringify({ task: "POLISH", content: currentText })
+      });
+      const data = await response.json();
+      if (data.result) {
+        updateBullet(expIndex, bulletIndex, data.result);
+      }
+    } catch (error) {
+      console.error("AI Polish failed:", error);
+    } finally {
+      setPolishingIndex(null);
+    }
+  };
+
+  const addExperience = () => {
+    updateData("experience", [
+      ...resumeData.experience, 
+      { company: "New Company", role: "Job Title", period: "2024 - Present", bullets: ["New responsibility..."] }
+    ]);
+  };
+
+  const removeExperience = (index: number) => {
+    updateData("experience", resumeData.experience.filter((_, i) => i !== index));
+  };
+
+  const addBullet = (expIndex: number) => {
+    const updatedExperience = [...resumeData.experience];
+    updatedExperience[expIndex].bullets.push("Enhanced core system reliability...");
+    updateData("experience", updatedExperience);
+  };
+
+  const removeBullet = (expIndex: number, bulletIndex: number) => {
+    const updatedExperience = [...resumeData.experience];
+    updatedExperience[expIndex].bullets = updatedExperience[expIndex].bullets.filter((_, i) => i !== bulletIndex);
+    updateData("experience", updatedExperience);
+  };
+
+  const updateSkill = (index: number, value: string) => {
+    const updatedSkills = [...resumeData.skills];
+    updatedSkills[index] = value;
+    updateData("skills", updatedSkills);
+  };
+
+  const addSkill = () => updateData("skills", [...resumeData.skills, "New Skill"]);
+  const removeSkill = (index: number) => updateData("skills", resumeData.skills.filter((_, i) => i !== index));
+
+  const updateEducation = (index: number, field: string, value: string) => {
+    const updatedEducation = [...resumeData.education];
+    updatedEducation[index] = { ...updatedEducation[index], [field]: value };
+    updateData("education", updatedEducation);
+  };
+
+  const addEducation = () => {
+    updateData("education", [
+      ...resumeData.education,
+      { school: "New Institution", degree: "Certification / Degree", year: "2024" }
+    ]);
+  };
+
+  const removeEducation = (index: number) => {
+    updateData("education", resumeData.education.filter((_, i) => i !== index));
   };
 
   return (
@@ -110,12 +267,27 @@ const BuilderPage = () => {
         }
       `}</style>
 
-      {/* Dark Sidebar */}
+      {/* Modern Sidebar */}
       <motion.aside 
         initial={{ x: -300 }}
         animate={{ x: 0 }}
-        className="w-96 bg-brand-charcoal text-white flex flex-col z-50 shadow-2xl no-print"
+        style={{ width: sidebarWidth }}
+        className="bg-brand-charcoal text-white flex flex-col z-50 shadow-2xl no-print relative"
       >
+        {/* Premium Resize Handle */}
+        <div 
+          onMouseDown={(e) => {
+            isResizing.current = true;
+            document.body.style.cursor = "col-resize";
+            e.preventDefault();
+          }}
+          className="absolute top-0 -right-2 w-4 h-full cursor-col-resize z-[60] group flex items-center justify-center transition-all"
+        >
+          <div className="w-[1px] h-full bg-white/5 group-hover:bg-brand-mint/50 transition-colors" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-12 bg-white/10 rounded-full group-hover:bg-brand-mint/80 border border-white/5 opacity-0 group-hover:opacity-100 transition-all blur-[1px] group-hover:blur-0" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-0.5 h-8 bg-white/20 rounded-full group-hover:bg-white group-hover:shadow-[0_0_10px_#2DD4BF]" />
+        </div>
+
         <div className="p-6 flex items-center justify-between border-b border-white/5">
           <Link href="/" className="flex items-center gap-2 group">
             <ChevronLeft className="w-4 h-4 text-slate-500 group-hover:text-brand-mint transition-colors" />
@@ -147,33 +319,231 @@ const BuilderPage = () => {
         {/* Sidebar Content */}
         <div className="p-6 grow overflow-y-auto custom-scrollbar space-y-8">
            {activeTab === "content" && (
-             <div className="space-y-6">
-                <div className="space-y-2">
-                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Full Name</label>
-                   <input 
-                    type="text" 
-                    value={resumeData.name} 
-                    onChange={(e) => updateData("name", e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-brand-mint focus:outline-none transition-all"
-                   />
+             <div className="space-y-10">
+                {/* Personal Header */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                    Profile Identity <div className="h-px grow bg-white/5" />
+                  </h3>
+                  <div className="space-y-4">
+                    <div className="relative group/field">
+                      <input 
+                        type="text" 
+                        placeholder="Name"
+                        value={resumeData.name || ""} 
+                        onChange={(e) => updateData("name", e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-brand-mint focus:outline-none transition-all pr-10"
+                      />
+                      <button 
+                        onClick={() => updateData("name", "")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-600 hover:text-red-400 opacity-0 group-hover/field:opacity-100 transition-all"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="relative group/field">
+                      <input 
+                        type="text" 
+                        placeholder="Job Title"
+                        value={resumeData.jobTitle || ""} 
+                        onChange={(e) => updateData("jobTitle", e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-brand-mint focus:outline-none transition-all pr-10"
+                      />
+                      <button 
+                        onClick={() => updateData("jobTitle", "")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-600 hover:text-red-400 opacity-0 group-hover/field:opacity-100 transition-all"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="relative group/field">
+                      <textarea 
+                        rows={4}
+                        placeholder="Professional Summary"
+                        value={resumeData.summary || ""} 
+                        onChange={(e) => updateData("summary", e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs leading-relaxed focus:border-brand-mint focus:outline-none transition-all resize-none pr-10"
+                      />
+                      <button 
+                        onClick={() => updateData("summary", "")}
+                        className="absolute right-3 top-4 text-slate-600 hover:text-red-400 opacity-0 group-hover/field:opacity-100 transition-all"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Job Title</label>
-                   <input 
-                    type="text" 
-                    value={resumeData.jobTitle} 
-                    onChange={(e) => updateData("jobTitle", e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-brand-mint focus:outline-none transition-all"
-                   />
+
+                {/* Contact Section */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                    Contact Details <div className="h-px grow bg-white/5" />
+                  </h3>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-4 py-2">
+                      <Mail className="w-4 h-4 text-slate-500" />
+                      <input 
+                        type="text" 
+                        value={resumeData.email} 
+                        onChange={(e) => updateData("email", e.target.value)}
+                        className="bg-transparent border-none p-0 text-sm w-full focus:ring-0 text-slate-300"
+                        placeholder="Email"
+                      />
+                    </div>
+                    <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-4 py-2">
+                      <Phone className="w-4 h-4 text-slate-500" />
+                      <input 
+                        type="text" 
+                        value={resumeData.phone} 
+                        onChange={(e) => updateData("phone", e.target.value)}
+                        className="bg-transparent border-none p-0 text-sm w-full focus:ring-0 text-slate-300"
+                        placeholder="Phone"
+                      />
+                    </div>
+                    <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-4 py-2">
+                      <MapPin className="w-4 h-4 text-slate-500" />
+                      <input 
+                        type="text" 
+                        value={resumeData.location} 
+                        onChange={(e) => updateData("location", e.target.value)}
+                        className="bg-transparent border-none p-0 text-sm w-full focus:ring-0 text-slate-300"
+                        placeholder="Location"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Resume Summary</label>
-                   <textarea 
-                    rows={6}
-                    value={resumeData.summary} 
-                    onChange={(e) => updateData("summary", e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs leading-relaxed focus:border-brand-mint focus:outline-none transition-all resize-none"
-                   />
+
+                {/* Experience List */}
+                <div className="space-y-6">
+                  <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 flex items-center justify-between">
+                    Experience
+                    <button onClick={addExperience} className="p-1 hover:text-brand-mint transition-colors">
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </h3>
+                  
+                  { (resumeData.experience || []).map((exp: any, expIdx: number) => (
+                    <div key={expIdx} className="p-4 bg-white/5 rounded-2xl space-y-4 relative group/exp">
+                       <button 
+                        onClick={() => removeExperience(expIdx)}
+                        className="absolute top-4 right-4 text-slate-600 hover:text-red-400 opacity-0 group-hover/exp:opacity-100 transition-all"
+                        title="Remove Experience"
+                       >
+                         <Trash2 className="w-4 h-4" />
+                       </button>
+
+                       <input 
+                        value={exp.company || ""}
+                        onChange={(e) => updateExperience(expIdx, "company", e.target.value)}
+                        className="w-full bg-transparent border-none p-0 text-sm font-bold focus:ring-0 text-white"
+                        placeholder="Company Name"
+                       />
+                       <input 
+                        value={exp.role || ""}
+                        onChange={(e) => updateExperience(expIdx, "role", e.target.value)}
+                        className="w-full bg-transparent border-none p-0 text-xs text-brand-mint focus:ring-0"
+                        placeholder="Role / Title"
+                       />
+
+                       <div className="space-y-3 pt-2">
+                          {exp.bullets?.map((bullet: string, bullIdx: number) => (
+                            <div key={bullIdx} className="flex gap-2 items-start group/bullet">
+                               <textarea 
+                                value={bullet || ""}
+                                onChange={(e) => updateBullet(expIdx, bullIdx, e.target.value)}
+                                className="flex-1 bg-white/5 border border-white/5 rounded-lg px-2 py-1.5 text-[10px] leading-relaxed resize-none focus:border-brand-mint/30 focus:outline-none text-slate-300"
+                                rows={2}
+                               />
+                               <div className="flex flex-col gap-1 opacity-0 group-hover/bullet:opacity-100 transition-all">
+                                 <button 
+                                   onClick={() => handleAIPolish(expIdx, bullIdx)} 
+                                   title="AI Polish" 
+                                   disabled={polishingIndex !== null}
+                                   className={`hover:scale-110 transition-transform ${polishingIndex?.exp === expIdx && polishingIndex?.bullet === bullIdx ? "text-brand-mint animate-pulse" : "text-brand-mint"}`}
+                                 >
+                                   {polishingIndex?.exp === expIdx && polishingIndex?.bullet === bullIdx ? (
+                                     <Loader2 className="w-3 h-3 animate-spin" />
+                                   ) : (
+                                     <Zap className="w-3 h-3" />
+                                   )}
+                                 </button>
+                                 <button onClick={() => removeBullet(expIdx, bullIdx)} className="text-slate-600 hover:text-red-400"><Trash2 className="w-3 h-3" /></button>
+                               </div>
+                            </div>
+                          ))}
+                          <button onClick={() => addBullet(expIdx)} className="text-[10px] text-slate-500 font-bold hover:text-white transition-colors flex items-center gap-1">
+                            <Plus className="w-3 h-3" /> Add Responsibility
+                          </button>
+                       </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Technical Skills */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 flex items-center justify-between">
+                    Skills Arsenal
+                    <button onClick={addSkill} className="p-1 hover:text-brand-mint transition-colors">
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </h3>
+                  <div className="grid grid-cols-2 gap-2">
+                     {(resumeData.skills || []).map((skill: string, i: number) => (
+                       <div key={i} className="flex items-center gap-2 bg-white/5 rounded-lg p-2 border border-white/5">
+                          <input 
+                            value={skill || ""}
+                            onChange={(e) => updateSkill(i, e.target.value)}
+                            className="bg-transparent border-none p-0 text-[10px] w-full focus:ring-0 text-slate-300"
+                          />
+                          <button 
+                            onClick={() => removeSkill(i)}
+                            className="text-slate-600 hover:text-red-400 transition-colors"
+                            title="Remove Skill"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                       </div>
+                     ))}
+                  </div>
+                </div>
+
+                {/* Education Section */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 flex items-center justify-between">
+                    Education
+                    <button onClick={addEducation} className="p-1 hover:text-brand-mint transition-colors">
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </h3>
+                  {resumeData.education.map((edu, i) => (
+                    <div key={i} className="p-4 bg-white/5 border border-white/10 rounded-2xl relative group/edu">
+                       <button 
+                        onClick={() => removeEducation(i)}
+                        className="absolute top-3 right-3 text-slate-600 hover:text-red-400 opacity-0 group-hover/edu:opacity-100 transition-all"
+                        title="Remove Education"
+                       >
+                         <Trash2 className="w-3 h-3" />
+                       </button>
+                       <input 
+                        value={edu.school || ""}
+                        onChange={(e) => updateEducation(i, "school", e.target.value)}
+                        className="w-full bg-transparent border-none p-0 text-[11px] font-bold focus:ring-0 text-white mb-1"
+                        placeholder="School / University"
+                       />
+                       <input 
+                        value={edu.degree || ""}
+                        onChange={(e) => updateEducation(i, "degree", e.target.value)}
+                        className="w-full bg-transparent border-none p-0 text-[10px] focus:ring-0 text-brand-mint mb-1"
+                        placeholder="Degree"
+                       />
+                       <input 
+                        value={edu.year || ""}
+                        onChange={(e) => updateEducation(i, "year", e.target.value)}
+                        className="w-full bg-transparent border-none p-0 text-[9px] focus:ring-0 text-slate-500 font-bold"
+                        placeholder="Year"
+                       />
+                    </div>
+                  ))}
                 </div>
              </div>
            )}
@@ -203,6 +573,29 @@ const BuilderPage = () => {
                        <span className="text-[10px] font-bold uppercase tracking-widest">Live Score: {resumeData.matchScore}%</span>
                     </div>
                     <p className="text-xs text-slate-300 leading-relaxed italic">"Your summary is highly optimized for DevOps roles. Add 2 more technical certifications to hit 98%."</p>
+                 </div>
+
+                 <div className="space-y-4">
+                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Resume Strategy</h3>
+                    <button 
+                     onClick={handleSmartCompact}
+                     disabled={isCompacting}
+                     className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-left hover:border-brand-mint/50 transition-all group"
+                    >
+                       <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-bold text-white group-hover:text-brand-mint transition-colors">Smart Compact</span>
+                          {isCompacting ? <Loader2 className="w-4 h-4 animate-spin text-brand-mint" /> : <ChevronLeft className="w-4 h-4 text-slate-600 group-hover:translate-x-[-2px] transition-transform" />}
+                       </div>
+                       <p className="text-[10px] text-slate-500 leading-relaxed">Condense all roles to fit on a single page while keeping all names and dates mandatory.</p>
+                    </button>
+
+                    <div className="p-4 bg-white/5 border border-dashed border-white/10 rounded-xl">
+                       <div className="flex items-center gap-2 text-slate-400 mb-2">
+                          <AlertCircle className="w-3 h-3" />
+                          <span className="text-[9px] font-bold uppercase tracking-widest">Growth Detected</span>
+                       </div>
+                       <p className="text-[10px] text-slate-500">Your resume is currently {resumeRef.current && resumeRef.current.offsetHeight > 1131 ? "multi-page" : "single-page"}. Use compact mode to slim it down.</p>
+                    </div>
                  </div>
               </div>
            )}
@@ -262,7 +655,7 @@ const BuilderPage = () => {
              ref={resumeRef}
              initial={{ y: 20, opacity: 0 }}
              animate={{ y: 0, opacity: 1 }}
-             className={`resume-paper w-[800px] min-h-[1132px] bg-white shadow-[0_10px_40px_rgba(0,0,0,0.1)] rounded-sm overflow-hidden flex ${selectedTemplate === 'modern' ? 'flex-row' : 'flex-col'}`}
+             className={`resume-paper w-[800px] h-fit min-h-[1132px] bg-white shadow-[0_10px_40px_rgba(0,0,0,0.1)] rounded-sm overflow-hidden flex ${selectedTemplate === 'modern' ? 'flex-row' : 'flex-col'}`}
            >
               {/* --- MODERN TEMPLATE (SIDEBAR LEFT) --- */}
               {selectedTemplate === 'modern' && (
@@ -291,6 +684,19 @@ const BuilderPage = () => {
                            ))}
                         </div>
                      </div>
+
+                     <div className="space-y-4">
+                        <h2 className="text-xs font-black uppercase tracking-widest text-slate-400 border-b border-slate-200 pb-2">Education</h2>
+                        <div className="space-y-4">
+                           {resumeData.education.map((edu, i) => (
+                             <div key={i} className="space-y-0.5">
+                                <h3 className="text-[10px] font-bold text-slate-800 uppercase">{edu.school}</h3>
+                                <p className="text-[9px] text-brand-mint font-bold italic">{edu.degree}</p>
+                                <p className="text-[8px] text-slate-400 font-bold">{edu.year}</p>
+                             </div>
+                           ))}
+                        </div>
+                     </div>
                   </div>
 
                   {/* Main content */}
@@ -313,12 +719,13 @@ const BuilderPage = () => {
                            {resumeData.experience.map((exp: any, i: number) => (
                              <div key={i} className="space-y-2">
                                 <div className="flex justify-between font-bold text-slate-800">
-                                   <h3>{exp.role} <span className="text-brand-mint">@</span> {exp.company}</h3>
-                                   <span className="text-xs">{exp.period}</span>
+                                   <h3>{exp.role} <span className="text-slate-300 font-light mx-2">|</span> {exp.company}</h3>
+                                   <span className="text-xs text-slate-400">{exp.period}</span>
                                 </div>
-                                <ul className="list-disc list-inside text-slate-600 space-y-1.5 ml-2 font-medium">
-                                   <li>Optimized CI/CD automation pipelines reducing deployment time by {15 + i * 5}%.</li>
-                                   <li>Ensured high-availability for production systems utilizing {resumeData.skills[i % 5]}.</li>
+                                <ul className="list-disc list-inside text-slate-600 space-y-2 ml-2 font-medium">
+                                   {exp.bullets?.map((bullet: string, bIdx: number) => (
+                                     <li key={bIdx}>{bullet}</li>
+                                   ))}
                                 </ul>
                              </div>
                            ))}
@@ -332,13 +739,13 @@ const BuilderPage = () => {
               {selectedTemplate !== 'modern' && (
                 <div className="p-16 flex flex-col gap-10">
                    <div className="text-center space-y-3">
-                      <h1 className="text-4xl font-black text-slate-900 tracking-tighter">{resumeData.name}</h1>
+                      <h1 className="text-4xl font-black text-slate-900 tracking-tighter">{resumeData.name || ""}</h1>
                       <div className="flex justify-center gap-4 text-xs font-bold text-slate-500 uppercase tracking-widest">
-                         <span>{resumeData.email}</span>
+                         <span>{resumeData.email || ""}</span>
                          <span>•</span>
-                         <span>{resumeData.phone}</span>
+                         <span>{resumeData.phone || ""}</span>
                          <span>•</span>
-                         <span>{resumeData.location}</span>
+                         <span>{resumeData.location || ""}</span>
                       </div>
                       <div className="h-px w-full bg-slate-200 mt-4" />
                    </div>
@@ -358,13 +765,14 @@ const BuilderPage = () => {
                               <div className="flex justify-between font-bold text-slate-900 border-l-4 border-brand-mint pl-4">
                                  <div>
                                     <h3 className="text-base">{exp.role}</h3>
-                                    <p className="text-xs text-slate-500 uppercase tracking-widest">{exp.company}</p>
+                                    <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">{exp.company}</p>
                                  </div>
                                  <span className="text-xs">{exp.period}</span>
                               </div>
-                              <ul className="list-disc list-inside text-sm text-slate-600 space-y-1.5 ml-4 font-medium">
-                                 <li>Spearheaded automation initiatives using {resumeData.skills[i % 5]}.</li>
-                                 <li>Collaborated with cross-functional teams to deliver stable release cycles.</li>
+                              <ul className="list-disc list-inside text-sm text-slate-600 space-y-2 ml-4 font-medium">
+                                 {exp.bullets?.map((bullet: string, bIdx: number) => (
+                                   <li key={bIdx}>{bullet}</li>
+                                 ))}
                               </ul>
                            </div>
                          ))}
@@ -379,6 +787,19 @@ const BuilderPage = () => {
                               {index > 0 && <span className="w-1 h-1 bg-slate-300 rounded-full" />}
                               {skill}
                            </span>
+                         ))}
+                      </div>
+                   </section>
+
+                   <section className="space-y-4">
+                      <h2 className="text-xs font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-1">Education Journey</h2>
+                      <div className="grid grid-cols-2 gap-8">
+                         {resumeData.education.map((edu, i) => (
+                           <div key={i} className="space-y-1">
+                              <h3 className="text-sm font-bold text-slate-900">{edu.school}</h3>
+                              <p className="text-xs text-brand-mint font-bold">{edu.degree}</p>
+                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{edu.year}</p>
+                           </div>
                          ))}
                       </div>
                    </section>

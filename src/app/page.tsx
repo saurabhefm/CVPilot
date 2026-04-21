@@ -10,6 +10,8 @@ import Pricing from "@/components/sections/Pricing";
 import SnippetModal from "@/components/ui/SnippetModal";
 import TemplateSelector from "@/components/sections/TemplateSelector";
 import StepTracker from "@/components/ui/StepTracker";
+import { motion, AnimatePresence } from "framer-motion";
+import { Wand2, Loader2 } from "lucide-react";
 
 const steps = [
   { id: 1, label: "Upload" },
@@ -22,12 +24,106 @@ export default function Home() {
   const [matchScore, setMatchScore] = useState(0);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
+  const [isParsing, setIsParsing] = useState(false);
+  const [parsingProgress, setParsingProgress] = useState(0);
+  
   const [modal, setModal] = useState<{ open: boolean; title: string; placeholder: string; action: string }>({
     open: false,
     title: "",
     placeholder: "",
     action: ""
   });
+
+  const handleFileUpload = async (fileObj: File) => {
+    setIsParsing(true);
+    setParsingProgress(10);
+    setFile(fileObj.name);
+
+    try {
+      // 1. Read PDF Text
+      const arrayBuffer = await fileObj.arrayBuffer();
+      
+      const pdfjs = await import("pdfjs-dist");
+      pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+      
+      const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+      console.log(`[PDF Parser] Total Pages: ${pdf.numPages}`);
+      
+      let fullText = "";
+      
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        let lastY;
+        let pageText = "";
+        
+        for (const item of textContent.items as any[]) {
+          if (lastY !== undefined && Math.abs(item.transform[5] - lastY) > 5) {
+             pageText += "\n";
+          }
+          pageText += item.str;
+          lastY = item.transform[5];
+        }
+        
+        fullText += pageText + "\n\n";
+        setParsingProgress(10 + (i / pdf.numPages) * 30);
+      }
+
+      console.log(`[PDF Parser] Total Characters Extracted: ${fullText.length}`);
+      setParsingProgress(50);
+      await processContent(fullText, fileObj.name);
+
+    } catch (error) {
+      console.error("Parsing failed:", error);
+      setIsParsing(false);
+      alert(`Parsing failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  const handleTextSubmit = async (text: string) => {
+    setIsParsing(true);
+    setParsingProgress(20);
+    setFile("Pasted Content");
+    
+    try {
+       await processContent(text, "Pasted Content");
+    } catch (error) {
+      console.error("Analysis failed:", error);
+      setIsParsing(false);
+      alert(`Analysis failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  const processContent = async (text: string, fileName: string) => {
+    // 2. Extract with AI
+    const response = await fetch("/api/ai", {
+      method: "POST",
+      body: JSON.stringify({ task: "EXTRACT", content: text })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "AI Extraction failed");
+    }
+    
+    setParsingProgress(90);
+    const profile = await response.json();
+
+    // 3. Save & Navigate
+    if (typeof window !== "undefined") {
+      const cleanName = (profile.name || fileName.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ")).trim();
+      localStorage.setItem("cv_file_name", fileName);
+      localStorage.setItem("cv_full_profile", JSON.stringify(profile));
+      localStorage.setItem("cv_user_name", cleanName);
+    }
+
+    setParsingProgress(100);
+    setTimeout(() => {
+      setIsParsing(false);
+      setCurrentStep(2);
+      scrollToSection("templates");
+    }, 500);
+  };
 
   const openModal = (title: string, placeholder: string, action: string) => {
     setModal({ open: true, title, placeholder, action });
@@ -49,56 +145,6 @@ export default function Home() {
     }
   };
 
-  const handleFileUpload = (name: string) => {
-    setFile(name);
-    setCurrentStep(2);
-    
-    // Save to localStorage for the builder
-    if (typeof window !== "undefined") {
-      const cleanName = name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
-      const mockProfile = {
-        name: "Saurabh Sahu",
-        email: "saurabhsahu143@gmail.com",
-        phone: "+91 9392495712",
-        location: "Pune, India (Remote)",
-        jobTitle: "CI/CD & DevOps Engineer",
-        summary: "Hands-on DevOps Engineer with a focus on CI/CD automation and pipeline deployment support. Proficient in building automated workflows using Jenkins, Git, and ArgoCD to streamline application delivery in cloud-native environments.",
-        experience: [
-          { 
-            company: "NTT DATA", 
-            role: "DevOps Engineer", 
-            period: "Feb 2025 - Present",
-            bullets: [
-              "Pipeline Automation: Implementing and maintaining end-to-end CI/CD processes using Jenkins, ArgoCD & Actions.",
-              "Deployment Support: Managing infrastructure and application deployments using CICD tool.",
-              "Version Control: Managing source code repositories and branching strategies through Bitbucket, Git, and GitHub."
-            ]
-          },
-          { 
-            company: "Previous Tech", 
-            role: "Cloud Systems Associate", 
-            period: "2022 - 2025",
-            bullets: [
-               "Spearheaded infrastructure-as-code initiatives using Terraform.",
-               "Managed multi-cloud environments for scaling microservices."
-            ]
-          }
-        ],
-        education: [
-          { school: "Premier Engineering College", degree: "B.Tech Computer Science", year: "2022" }
-        ],
-        skills: ["Kubernetes", "Docker", "ArgoCD", "Jenkins", "Terraform", "Git", "Bitbucket", "Ansible", "YAML", "Shell Scripting"]
-      };
-      
-      localStorage.setItem("cv_file_name", name);
-      localStorage.setItem("cv_full_profile", JSON.stringify(mockProfile));
-      localStorage.setItem("cv_user_name", cleanName);
-    }
-
-    // Auto-scroll to templates after a short delay for feedback
-    setTimeout(() => scrollToSection("templates"), 800);
-  };
-
   const handleTemplateSelect = (id: string) => {
     setSelectedTemplate(id);
     if (typeof window !== "undefined") {
@@ -116,12 +162,52 @@ export default function Home() {
 
   return (
     <>
+      <AnimatePresence>
+        {isParsing && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-brand-charcoal/90 backdrop-blur-xl flex flex-col items-center justify-center p-8 text-center"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="max-w-md w-full space-y-8"
+            >
+              <div className="relative w-24 h-24 mx-auto">
+                 <Loader2 className="w-24 h-24 text-brand-mint animate-spin opacity-20" />
+                 <Wand2 className="w-10 h-10 text-brand-mint absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-3xl font-black text-white tracking-tight">Analyzing Career DNA</h2>
+                <p className="text-slate-400 font-medium">Our AI is mapping your experience to the digital canvas...</p>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: `${parsingProgress}%` }}
+                    className="h-full bg-brand-mint shadow-[0_0_20px_rgba(16,185,129,0.5)]"
+                  />
+                </div>
+                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
+                   <span>Extraction: {Math.round(parsingProgress)}%</span>
+                   <span>Model: Google Gemini</span>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div id="hero">
         <Hero matchScore={matchScore} openModal={openModal} />
       </div>
       
       <div id="upload">
-        <UploadZone onFileUpload={handleFileUpload} />
+        <UploadZone onFileUpload={handleFileUpload} onTextSubmit={handleTextSubmit} />
       </div>
       
       <div id="features">
