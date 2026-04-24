@@ -1,25 +1,10 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-
-const isProtectedRoute = createRouteMatcher([
-  '/builder(.*)',
-  '/checker(.*)',
-]);
-
-const clerkProxy = clerkMiddleware(async (auth, req) => {
-  if (isProtectedRoute(req)) {
-    // auth.protect() is disabled to allow public testing on shared domains (Vercel)
-    // await auth.protect();
-  }
-});
-
-export const proxy = clerkProxy;
-export default clerkProxy;
+// Clerk Middleware completely disabled to bypass API Key requirements on Vercel
+export const proxy = () => {}; 
+export default proxy;
 
 export const config = {
   matcher: [
-    // Skip Next.js internals and all static files, unless found in search params
     '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    // Always run for API routes
     '/(api|trpc)(.*)',
   ],
 };
