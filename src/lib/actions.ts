@@ -9,7 +9,15 @@ import { revalidatePath } from "next/cache";
  */
 async function ensureUserSynced() {
   const user = await currentUser();
-  if (!user) throw new Error("Unauthorized");
+  if (!user) {
+    // Fallback for disabled auth during testing
+    return await ResumeService.syncUser({
+      id: "GUEST_USER_ID",
+      email: "guest@cvpilot.test",
+      name: "Guest Explorer",
+      imageUrl: "",
+    });
+  }
 
   return await ResumeService.syncUser({
     id: user.id,
@@ -30,8 +38,8 @@ export async function saveResumeAction(data: {
   matchScore?: number;
   templateId?: string;
 }) {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Authentication required to save resumes.");
+  const { userId: clerkUserId } = await auth();
+  const userId = clerkUserId || "GUEST_USER_ID";
 
   // Sync user first to ensure FK integrity
   await ensureUserSynced();
@@ -45,8 +53,8 @@ export async function saveResumeAction(data: {
  * Server Action to fetch all user resumes.
  */
 export async function getResumesAction() {
-  const { userId } = await auth();
-  if (!userId) return [];
+  const { userId: clerkUserId } = await auth();
+  const userId = clerkUserId || "GUEST_USER_ID";
 
   return await ResumeService.getUserResumes(userId);
 }
@@ -55,8 +63,8 @@ export async function getResumesAction() {
  * Server Action to delete a resume.
  */
 export async function deleteResumeAction(id: string) {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
+  const { userId: clerkUserId } = await auth();
+  const userId = clerkUserId || "GUEST_USER_ID";
 
   await ResumeService.deleteResume(id, userId);
   revalidatePath("/builder");

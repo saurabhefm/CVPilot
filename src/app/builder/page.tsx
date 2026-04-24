@@ -34,7 +34,10 @@ import { toPng } from "html-to-image";
 
 const BuilderPage = () => {
   const { theme } = useTheme();
-  const { isLoaded, isSignedIn } = useUser();
+  const { isLoaded: clerkLoaded, isSignedIn: clerkSignedIn } = useUser();
+  // Clerk Auth disabled for public testing
+  const isLoaded = true;
+  const isSignedIn = true;
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [activeTab, setActiveTab] = useState("content");

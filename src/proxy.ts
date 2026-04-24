@@ -7,7 +7,8 @@ const isProtectedRoute = createRouteMatcher([
 
 const clerkProxy = clerkMiddleware(async (auth, req) => {
   if (isProtectedRoute(req)) {
-    await auth.protect();
+    // auth.protect() is disabled to allow public testing on shared domains (Vercel)
+    // await auth.protect();
   }
 });
 

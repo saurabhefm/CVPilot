@@ -22,7 +22,10 @@ import {
 } from "@clerk/nextjs";
 
 const Navbar = () => {
-  const { isLoaded, isSignedIn } = useUser();
+  const { isLoaded: clerkLoaded, isSignedIn: clerkSignedIn } = useUser();
+  // Clerk Auth disabled for public testing
+  const isLoaded = true;
+  const isSignedIn = true;
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
   const toggleMenu = (menu: string) => {
